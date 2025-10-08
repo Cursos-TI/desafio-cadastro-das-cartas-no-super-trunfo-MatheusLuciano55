@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h> // Para a função exit()
 
 // Definição da estrutura para representar uma Carta de País
 typedef struct {
@@ -13,46 +14,76 @@ typedef struct {
     float pib_per_capita; // PIB / População
 } CartaSuperTrunfo;
 
+// Array global de strings para o nome dos atributos
+const char *ATRIBUTOS[] = {
+    "Nenhum", // Índice 0 (vazio)
+    "População (em Milhões)",
+    "Área (em Milhares de km²)",
+    "PIB (em Trilhões)",
+    "Pontos Turísticos",
+    "Densidade Demográfica", // Menor vence
+    "PIB Per Capita"
+};
+#define NUM_ATRIBUTOS 6 // População (1) a PIB Per Capita (6)
+
 // --- Função para calcular métricas derivadas (reutilizada) ---
 void calcular_metricas(CartaSuperTrunfo *carta) {
-    // População em milhões / Área em milhares de km²
     if (carta->area > 0) {
         carta->densidade_demografica = (float)carta->populacao / carta->area;
     } else {
         carta->densidade_demografica = 0.0;
     }
 
-    // PIB em trilhões / População em milhões
     if (carta->populacao > 0) {
+        // PIB em trilhões / População em milhões
         carta->pib_per_capita = carta->pib / (float)carta->populacao;
     } else {
         carta->pib_per_capita = 0.0;
     }
 }
 
-// --- Função para exibir o menu e obter a escolha do usuário ---
-int exibir_menu() {
-    int escolha;
-    printf("\n========================================\n");
-    printf("        Escolha o Atributo (Super Trunfo)     \n");
-    printf("========================================\n");
-    printf("1. População (Maior vence)\n");
-    printf("2. Área (Maior vence)\n");
-    printf("3. PIB (Maior vence)\n");
-    printf("4. Número de Pontos Turísticos (Maior vence)\n");
-    printf("5. Densidade Demográfica (Menor vence)\n");
-    printf("6. PIB Per Capita (Maior vence)\n");
-    printf("7. Sair do Jogo\n");
-    printf("----------------------------------------\n");
-    printf("Digite sua escolha (1-7): ");
-    
-    // Verifica se a leitura da entrada foi bem-sucedida
-    if (scanf("%d", &escolha) != 1) {
-        // Limpa o buffer de entrada em caso de erro (caractere não numérico)
-        while (getchar() != '\n');
-        return 0; // Retorna uma opção inválida
+// --- Função para retornar o valor do atributo da carta com base no índice ---
+float obter_valor_atributo(const CartaSuperTrunfo *carta, int indice) {
+    switch (indice) {
+        case 1: return (float)carta->populacao;
+        case 2: return carta->area;
+        case 3: return carta->pib;
+        case 4: return (float)carta->pontos_turisticos;
+        case 5: return carta->densidade_demografica;
+        case 6: return carta->pib_per_capita;
+        default: return 0.0; // Opção de segurança
     }
-    
+}
+
+// --- Função para exibir o menu dinâmico e obter a escolha do usuário ---
+// 'excluir_indice' garante que o atributo escolhido não apareça novamente.
+int exibir_menu_dinamico(int excluir_indice) {
+    int escolha;
+    int i;
+    printf("\n========================================\n");
+    printf("        Escolha um Atributo (1 a %d)     \n", NUM_ATRIBUTOS);
+    printf("========================================\n");
+
+    for (i = 1; i <= NUM_ATRIBUTOS; i++) {
+        if (i != excluir_indice) {
+            // Usa o operador ternário para exibir a regra de comparação
+            const char *regra = (i == 5) ? "(Menor vence)" : "(Maior vence)";
+            printf("%d. %s %s\n", i, ATRIBUTOS[i], regra);
+        }
+    }
+    printf("----------------------------------------\n");
+    printf("Digite sua escolha: ");
+
+    if (scanf("%d", &escolha) != 1) {
+        while (getchar() != '\n'); // Limpa o buffer de entrada
+        return 0; // Opção inválida
+    }
+
+    // Lógica para garantir que a opção é válida e não é o índice excluído
+    if (escolha < 1 || escolha > NUM_ATRIBUTOS || escolha == excluir_indice) {
+        return 0;
+    }
+
     return escolha;
 }
 
@@ -60,120 +91,110 @@ int exibir_menu() {
 int main() {
     // ----------------------------------------------------
     // 1. DADOS DAS DUAS CARTAS (PRÉ-DEFINIDAS)
-    // Usando dados simulados e convertidos para facilitar os cálculos (Milhões/Trilhões)
     // ----------------------------------------------------
-
-    // Carta 1: Brasil
     CartaSuperTrunfo carta1 = {
         .nome_pais = "Brasil",
-        .codigo_carta = "CTBR",
-        .populacao = 217,           // População em milhões
-        .area = 8515,               // Área em milhares de km²
-        .pib = 2.1,                 // PIB em trilhões de dólares (simulado)
+        .populacao = 217,
+        .area = 8515.7,
+        .pib = 2.1,
         .pontos_turisticos = 50
     };
 
-    // Carta 2: Índia
     CartaSuperTrunfo carta2 = {
         .nome_pais = "Índia",
-        .codigo_carta = "CTIN",
-        .populacao = 1441,          // População em milhões
-        .area = 3287,               // Área em milhares de km²
-        .pib = 3.9,                 // PIB em trilhões de dólares (simulado)
+        .populacao = 1441,
+        .area = 3287.3,
+        .pib = 3.9,
         .pontos_turisticos = 75
     };
 
-    // Cálculo inicial de métricas derivadas
+    // Cálculo inicial de métricas
     calcular_metricas(&carta1);
     calcular_metricas(&carta2);
 
-    int escolha;
-    // Loop principal para interatividade
+    int atributo1 = 0, atributo2 = 0;
+    float valor1_c1, valor1_c2, valor2_c1, valor2_c2;
+    float soma_c1, soma_c2;
+
+    printf(">>> Jogo Super Trunfo Avançado <<<\n");
+    printf("Cartas em Jogo: 1. %s vs 2. %s\n", carta1.nome_pais, carta2.nome_pais);
+
+    // ----------------------------------------------------
+    // 2. ESCOLHA DO PRIMEIRO ATRIBUTO
+    // ----------------------------------------------------
     do {
-        escolha = exibir_menu();
-
-        // Variáveis para armazenar o valor e o nome do atributo selecionado
-        float valor1, valor2;
-        char *atributo_nome = NULL;
-        // 0 = Maior vence (Padrão); 1 = Menor vence (Densidade Demográfica)
-        int regra_menor_vence = 0;
-
-        // ----------------------------------------------------
-        // 2. ESTRUTURA SWITCH PARA SELECIONAR O ATRIBUTO
-        // ----------------------------------------------------
-        switch (escolha) {
-            case 1: // População
-                valor1 = (float)carta1.populacao;
-                valor2 = (float)carta2.populacao;
-                atributo_nome = "População (em milhões)";
-                break;
-            case 2: // Área
-                valor1 = carta1.area;
-                valor2 = carta2.area;
-                atributo_nome = "Área (em milhares de km²)";
-                break;
-            case 3: // PIB
-                valor1 = carta1.pib;
-                valor2 = carta2.pib;
-                atributo_nome = "PIB (em trilhões)";
-                break;
-            case 4: // Pontos Turísticos
-                valor1 = (float)carta1.pontos_turisticos;
-                valor2 = (float)carta2.pontos_turisticos;
-                atributo_nome = "Número de Pontos Turísticos";
-                break;
-            case 5: // Densidade Demográfica (Regra especial: Menor vence)
-                valor1 = carta1.densidade_demografica;
-                valor2 = carta2.densidade_demografica;
-                atributo_nome = "Densidade Demográfica";
-                regra_menor_vence = 1; // Inverte a regra
-                break;
-            case 6: // PIB Per Capita
-                valor1 = carta1.pib_per_capita;
-                valor2 = carta2.pib_per_capita;
-                atributo_nome = "PIB Per Capita";
-                break;
-            case 7: // Sair do Jogo
-                printf("\nObrigado por jogar! Fim do programa.\n");
-                return 0;
-            default:
-                // Tratamento de entrada inválida (requisito não funcional)
-                if (escolha != 7) {
-                    printf("\nOpção inválida. Por favor, escolha um número de 1 a 7.\n");
-                }
-                continue; // Volta para o início do loop
+        atributo1 = exibir_menu_dinamico(0); // 0 indica que nenhum índice deve ser excluído
+        if (atributo1 == 0) {
+            printf("\nOpção inválida ou fora do intervalo. Tente novamente.\n");
         }
+    } while (atributo1 == 0);
 
-        // ----------------------------------------------------
-        // 3. EXIBIÇÃO E LÓGICA DE COMPARAÇÃO ANINHADA (IF-ELSE)
-        // ----------------------------------------------------
-        printf("\n--- Comparação de Cartas ---\n");
-        printf("Atributo Escolhido: %s\n", atributo_nome);
-        printf("Carta 1 - %s: %.2f\n", carta1.nome_pais, valor1);
-        printf("Carta 2 - %s: %.2f\n", carta2.nome_pais, valor2);
-        printf("---------------------------\n");
+    // ----------------------------------------------------
+    // 3. ESCOLHA DO SEGUNDO ATRIBUTO (Dinâmico)
+    // ----------------------------------------------------
+    printf("\n--- Primeiro Atributo Escolhido: %s ---\n", ATRIBUTOS[atributo1]);
 
-        if (regra_menor_vence == 1) {
-            // Lógica ANINHADA para Densidade Demográfica (Menor valor vence)
-            if (valor1 < valor2) {
-                printf("Resultado: Carta 1 (%s) venceu (Menor valor)!\n", carta1.nome_pais);
-            } else if (valor2 < valor1) {
-                printf("Resultado: Carta 2 (%s) venceu (Menor valor)!\n", carta2.nome_pais);
-            } else {
-                printf("Resultado: Empate!\n");
-            }
-        } else {
-            // Lógica Padrão (Maior valor vence)
-            if (valor1 > valor2) {
-                printf("Resultado: Carta 1 (%s) venceu (Maior valor)!\n", carta1.nome_pais);
-            } else if (valor2 > valor1) {
-                printf("Resultado: Carta 2 (%s) venceu (Maior valor)!\n", carta2.nome_pais);
-            } else {
-                printf("Resultado: Empate!\n");
-            }
+    do {
+        printf("\nEscolha o SEGUNDO atributo para comparação (Diferente do primeiro).\n");
+        atributo2 = exibir_menu_dinamico(atributo1); // Exclui o primeiro atributo
+        if (atributo2 == 0) {
+            printf("\nOpção inválida. Escolha um número que não seja o %d.\n", atributo1);
         }
+    } while (atributo2 == 0);
 
-    } while (escolha != 7); // Continua o loop até o usuário escolher Sair
+    printf("\n--- Segundo Atributo Escolhido: %s ---\n", ATRIBUTOS[atributo2]);
+
+    // ----------------------------------------------------
+    // 4. PREPARAÇÃO DOS VALORES E CÁLCULO DA SOMA
+    // ----------------------------------------------------
+    valor1_c1 = obter_valor_atributo(&carta1, atributo1);
+    valor1_c2 = obter_valor_atributo(&carta2, atributo1);
+    valor2_c1 = obter_valor_atributo(&carta1, atributo2);
+    valor2_c2 = obter_valor_atributo(&carta2, atributo2);
+
+    // Soma dos valores dos dois atributos para cada carta
+    soma_c1 = valor1_c1 + valor2_c1;
+    soma_c2 = valor1_c2 + valor2_c2;
+
+    // ----------------------------------------------------
+    // 5. EXIBIÇÃO CLARA DO RESULTADO E COMPARAÇÃO FINAL
+    // ----------------------------------------------------
+    printf("\n======================================================\n");
+    printf("                RESULTADO DA RODADA                   \n");
+    printf("======================================================\n");
+
+    // Detalhe do Atributo 1
+    printf("1º Atributo (%s):\n", ATRIBUTOS[atributo1]);
+    printf("  %s: %.4f | %s: %.4f\n", carta1.nome_pais, valor1_c1, carta2.nome_pais, valor1_c2);
+    // Operador Ternário para determinar o vencedor baseado na regra
+    const char *vencedor1 = (atributo1 == 5)
+                            ? ((valor1_c1 < valor1_c2) ? carta1.nome_pais : ((valor1_c2 < valor1_c1) ? carta2.nome_pais : "Empate"))
+                            : ((valor1_c1 > valor1_c2) ? carta1.nome_pais : ((valor1_c2 > valor1_c1) ? carta2.nome_pais : "Empate"));
+    printf("  Vencedor Individual: %s\n", vencedor1);
+    
+    printf("\n2º Atributo (%s):\n", ATRIBUTOS[atributo2]);
+    printf("  %s: %.4f | %s: %.4f\n", carta1.nome_pais, valor2_c1, carta2.nome_pais, valor2_c2);
+    // Operador Ternário para determinar o vencedor baseado na regra
+    const char *vencedor2 = (atributo2 == 5)
+                            ? ((valor2_c1 < valor2_c2) ? carta1.nome_pais : ((valor2_c2 < valor2_c1) ? carta2.nome_pais : "Empate"))
+                            : ((valor2_c1 > valor2_c2) ? carta1.nome_pais : ((valor2_c2 > valor2_c1) ? carta2.nome_pais : "Empate"));
+    printf("  Vencedor Individual: %s\n", vencedor2);
+
+
+    printf("\n--- SOMA FINAL ---\n");
+    printf("%s (Soma): %.4f\n", carta1.nome_pais, soma_c1);
+    printf("%s (Soma): %.4f\n", carta2.nome_pais, soma_c2);
+    
+    // Comparação final baseada na Soma (Regra: Maior Soma Vence)
+    if (soma_c1 > soma_c2) {
+        printf("\n>>> VENCEDOR DA RODADA: %s! <<<\n", carta1.nome_pais);
+    } else if (soma_c2 > soma_c1) {
+        printf("\n>>> VENCEDOR DA RODADA: %s! <<<\n", carta2.nome_pais);
+    } else {
+        printf("\n>>> EMPATE! A soma dos atributos é igual. <<<\n");
+    }
+
+    printf("======================================================\n");
 
     return 0;
 }
